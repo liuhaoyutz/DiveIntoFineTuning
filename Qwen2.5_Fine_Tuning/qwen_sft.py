@@ -5,7 +5,7 @@ from modelscope import AutoModelForCausalLM, AutoTokenizer
 import torch
 from peft import LoraConfig
 
-print('cuda support:',torch.cuda.is_available())
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 SYSTEM_PROMPT='''
 # 任务
@@ -33,12 +33,12 @@ def load_distill_dataset():
             ds['messages'].append(sample)
     return Dataset.from_dict(ds)
 
-model_name='Qwen/Qwen2.5-3B-Instruct'
-model=AutoModelForCausalLM.from_pretrained(model_name,torch_dtype="auto",device_map="auto")
-tokenizer=AutoTokenizer.from_pretrained(model_name)
-dataset=load_distill_dataset()
+model_name = 'Qwen/Qwen2.5-3B-Instruct'
+model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto").to(device)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+dataset = load_distill_dataset()
 
-sft_config=SFTConfig(
+sft_config = SFTConfig(
     per_device_train_batch_size=1,
     gradient_accumulation_steps=4,
     lr_scheduler_type='linear',
@@ -53,14 +53,14 @@ sft_config=SFTConfig(
     max_grad_norm=0.1,
     output_dir='./qwen_distill/',
 )
-lora_config=LoraConfig(
+lora_config = LoraConfig(
     r=32,
     lora_alpha=64,
     target_modules=['q_proj','k_proj','v_proj','o_proj','gate_proj','up_proj','down_proj'],
     lora_dropout=0.05,
     task_type='CAUSAL_LM',
 )
-trainer=SFTTrainer(
+trainer = SFTTrainer(
     model=model,
     processing_class=tokenizer,
     train_dataset=dataset,
