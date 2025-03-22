@@ -27,10 +27,11 @@ PROMPT='''
 '''
 
 THREAD=30
-SAMPLES=1000
+SAMPLES=1000 # 生成1000条问答对
 
 class R1Generator:
     def __init__(self,threads,dataset,samples):
+        # 使用本地部署的DeepSeek-r1服务
         self.client=OpenAI(api_key="EMPTY",base_url="http://127.0.0.1:11434/v1")
         self.idx=0
         self.threads=threads
@@ -54,15 +55,12 @@ class R1Generator:
             return ('', text.strip())
 
     def generate(self,question):
+        # 以question向本地部署的DeepSeek-r1提问，得到回答保存到completion中
         completion=self.client.chat.completions.create(
             model="deepseek-r1:32b",
-            #model="deepseek-reasoner",
             messages=[
                 {'role': 'user', 'content': PROMPT.format(question=question)},
-            ],
-            extra_body={  # 某些平台允许扩展参数
-                "return_reasoning": True
-            }
+            ]
         )
 
         # 使用在线推理时reasoning放在completion.choices[0].message.reasoning_content中，answer放在completion.choices[0].message.content中， 
@@ -72,52 +70,80 @@ class R1Generator:
         #print(completion.choices[0].message.content)
         #return completion.choices[0].message.reasoning_content,completion.choices[0].message.content
         
+        # 从completion.choices[0].message.content中解析出reasoning和answer
         reasoning, answer = self.split_think_answer(completion.choices[0].message.content)
         return reasoning, answer
 
     def begin(self):
         self.idx=0
-        self.progress=0
+        self.progress=0  # 总进度
         self.result=[None]*self.samples
         self.thread_handlers=[]
-        for i in range(self.threads):
-            t=threading.Thread(target=self.thread_main)
+
+        # 创建30个线程
+        for i in range(self.threads):  
+            # 创建了一个新的线程对象t，其线程函数是self.thread_main
+            t=threading.Thread(target=self.thread_main)  
+            
+            # 启动线程
             t.start()
+
+            # 将新创建并已启动的线程t添加到列表self.thread_handlers中
             self.thread_handlers.append(t)
 
     def join(self):
+        # 该函数用于每隔1秒钟打印一次进度，直到处理完1000条数据
         while True:
             with self.mutex:
                 print(f'Progress: {self.progress}/{self.samples}',end='\r')
                 if self.progress>=self.samples:
                     break
             time.sleep(1)
+        
+        # 等待30个线程结束
         for t in self.thread_handlers:
             t.join()
+        
+        # 返回所有(question,reasoning,answer)元组组成的列表
         return [res for res in self.result if res is not None]
     
     def thread_main(self):
+        # 注意：共30个线程，每个线程都是循环执行的，直到处理完了1000条问答对。
         while True:
             with self.mutex:
-                if self.idx>=self.samples:
+                if self.idx>=self.samples:  # 最多处理1000条问答对
                     break
-                cur_idx=self.idx
-                self.idx+=1
+                cur_idx=self.idx  # 当前要处理的问答对编号
+                self.idx+=1  # 下一次要处理的问答对编号
+
             try:
+                # 从gsm8k数据集中取出第cur_idx个样本的'question'
                 question=self.dataset[cur_idx]['question']
+
+                # 以question为参数，调用self.generate函数向DeepSeek-r1模型提问，得到reasoning和answer。
                 reasoning,answer=self.generate(question)
+
+                # 将元组(question,reasoning,answer)保存在列表self.result的第cur_idx位置。
                 self.result[cur_idx]=(question,reasoning,answer)
             except:
                 pass
             with self.mutex:
-                self.progress+=1
+                self.progress+=1  # 总进度加1。进入下一轮循环，处理下一条问答对。
 
 if __name__=='__main__':
+    # 创建数据集，得到的gsm8k是一个MsDataset类对象，封装了7473条问答对，
     gsm8k=MsDataset.load('modelscope/gsm8k',subset_name='main',split='train')
+
+    # 初始化R1Generator对象
     r1=R1Generator(threads=THREAD,dataset=gsm8k,samples=SAMPLES)
-    r1.begin()
+
+    # 开始生成数据
+    r1.begin()  
+
+    # 等待所有数据处理完全，每隔一秒打印一次进度
     result=r1.join()
 
+    # 将得到的数据集写到文件中
     with open('deepseek_r1_distill_dataset.txt','w') as f:
         for res in result:
             question,reasoning,answer=res

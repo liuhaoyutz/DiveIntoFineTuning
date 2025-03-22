@@ -29,12 +29,14 @@ def chat_streaming(model_selector,query,history):
     model_inputs=tokenizer([text], return_tensors="pt").to(model.device)
 
     if model_selector=='Qwen Base Model':
-        model.disable_adapters()
+        model.disable_adapters()  # 使用原始Qwen模型
     else:
-        model.enable_adapters()
+        model.enable_adapters()  # 使用经过SFT的Qwen模型
 
     streamer=TextIteratorStreamer(tokenizer,skip_prompt=True,skip_special_tokens=True)
     generation_kwargs=dict(model_inputs,streamer=streamer,max_new_tokens=2000)
+
+    # 与模型进行对应
     thread=Thread(target=model.generate,kwargs=generation_kwargs)
     thread.start()
     for resp in streamer:
@@ -74,6 +76,10 @@ if __name__ == "__main__":
     
     # Find latest checkpoint
     checkpoints=os.listdir('qwen_distill/')
+
+    # 用filter函数过滤checkpoints列表中的元素，只保留那些以字符串'checkpoint'开头的元素。lambda x: x.startswith('checkpoint')是一个匿名函数，用于定义过滤条件。
+    # 用sorted函数对通过过滤后的检查点进行排序。key参数指定了一个用来从每个元素中提取比较键的函数。lambda x: int(x.split('-')[-1]) 这个匿名函数将每个检查点名称按 '-' 分割，并转换分割后最后一部分为整数作为排序依据。
+    # 最后，通过索引 [-1] 获取排序后列表中的最后一个元素，也就是具有最大步骤编号的最新检查点。
     latest_checkpoints=sorted(filter(lambda x: x.startswith('checkpoint'),checkpoints),key=lambda x: int(x.split('-')[-1]))[-1]
     lora_name=f'qwen_distill/{latest_checkpoints}'
     

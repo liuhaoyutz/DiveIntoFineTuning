@@ -18,26 +18,39 @@ SYSTEM_PROMPT='''
 以老师的第一人称视角，给学生开始讲解。
 '''
 
+# 从文本文件中加载数据集，并转换为Hugging Face的datasets库中的Dataset对象
 def load_distill_dataset():
+    # ds是一个字典，'messages'是key, value是一个初始为空的列表
     ds={'messages':[]}
     with open('deepseek_r1_distill_dataset.txt','r') as f:
-    #with open('r1_distill.txt','r') as f:
         lines=f.readlines()
         for line in lines:
-            line=json.loads(line)
+            line=json.loads(line)  # 每一行是一个以json格式保存的样本，json_loads将json格式数据解析为python字典
+
+            # 创建sample列表，它代表一次对话，包括3个字典，分别代表'system', 'user', 'assistant'的消息
             sample=[
                     {'role':'system','content':SYSTEM_PROMPT}, 
                     {'role':'user','content': line['question']}, 
                     {'role':'assistant','content': f"<think>{line['reasoning']}</think>{line['answer']}"},
             ]
+
+            # 把sample添加到ds['messages']列表中。
             ds['messages'].append(sample)
+
+    # ds是一个字典，用ds初始化Dataset对象并返回
     return Dataset.from_dict(ds)
 
+# 加载模型
 model_name = 'Qwen/Qwen2.5-3B-Instruct'
 model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto").to(device)
+
+# 加载tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+# 加载数据集
 dataset = load_distill_dataset()
 
+# 配置SFT参数
 sft_config = SFTConfig(
     per_device_train_batch_size=1,
     gradient_accumulation_steps=4,
@@ -53,6 +66,8 @@ sft_config = SFTConfig(
     max_grad_norm=0.1,
     output_dir='./qwen_distill/',
 )
+
+# 配置LoRA微调参数
 lora_config = LoraConfig(
     r=32,
     lora_alpha=64,
@@ -60,6 +75,8 @@ lora_config = LoraConfig(
     lora_dropout=0.05,
     task_type='CAUSAL_LM',
 )
+
+# 生成训练器
 trainer = SFTTrainer(
     model=model,
     processing_class=tokenizer,
@@ -67,4 +84,6 @@ trainer = SFTTrainer(
     args=sft_config,
     peft_config=lora_config,
 )
+
+# 开始训练
 trainer.train()
