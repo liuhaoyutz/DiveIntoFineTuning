@@ -17,6 +17,7 @@ python qwen_eval.py
 python qwen_webui.py  
 
 Qwen目录下提供对Qwen模型进行SFT微调的脚本。  
+Qwen/finetune_qwen_base_custom_city_date_dataset_demo.ipynb演示了怎样创建自定义数据集，通过SFT微调Qwen模型，使模型按json格式回答问题。
 
 Reference：  
 https://github.com/owenliang/DeepSeek-Distill-Qwen-For-Child
