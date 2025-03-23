@@ -17,7 +17,12 @@ python qwen_eval.py
 python qwen_webui.py  
 
 Qwen目录下提供对Qwen模型进行SFT微调的脚本。  
-Qwen/finetune_qwen_base_custom_city_date_dataset_demo.ipynb演示了怎样创建自定义数据集，通过SFT微调Qwen模型，使模型按json格式回答问题。
-
+Qwen/finetune_qwen_base_custom_city_date_dataset_demo.ipynb演示了怎样创建自定义数据集，通过SFT微调Qwen模型，使模型按json格式回答问题。  
+Qwen/finetune_qwen_base_custom_law_dataset_demo.ipynb演示了怎样自定义法律数据集，通过SFT微调Qwen模型，提升回答法律相关问题效果。  
+  
+LLaMA-Factory目录下是LLaMA-Factory微调脚本。  
+LLaMA-Factory/LLaMA-Factory-Fine-Tune-Qwen-Demo.ipynb演示了怎样用LLaMA-Factory微调Qwen模型。  
+LLaMA-Factory/transform_sharegpt_to_alpaca.py演示了怎样把shardgpt格式的数据集转换成alpaca格式。  
+  
 Reference：  
 https://github.com/owenliang/DeepSeek-Distill-Qwen-For-Child
